@@ -5,5 +5,5 @@ from .models import Host
 
 @admin.register(Host)
 class HostAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "hostname", "port", "owner")
-    search_fields = ("name", "hostname", "owner__username")
+    list_display = ("id", "alias", "ip_address", "port", "created_by")
+    search_fields = ("alias", "ip_address", "created_by__username")

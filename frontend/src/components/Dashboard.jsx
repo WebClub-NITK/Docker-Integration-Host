@@ -2,6 +2,7 @@ import { useAuth } from '../context/AuthContext';
 import { useEffect, useMemo, useState } from 'react';
 import { imageService } from '../services/imageService';
 import { containerService } from '../services/containerService';
+import { hostService } from '../services/hostService';
 import ImageGallery from './ImageGallery';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,7 +55,8 @@ import {
 export default function Dashboard({ theme, toggleTheme }) {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('build');
-  const [hostId, setHostId] = useState('1');
+  const [hosts, setHosts] = useState([]);
+  const [hostId, setHostId] = useState('');
   const [tag, setTag] = useState('');
   const [dockerfile, setDockerfile] = useState('FROM alpine:3.20\nRUN echo "hello from build pipeline"\nCMD ["sh"]');
   const [contextZip, setContextZip] = useState(null);
@@ -75,6 +77,18 @@ export default function Dashboard({ theme, toggleTheme }) {
   const [deployError, setDeployError] = useState('');
   const [deploySuccess, setDeploySuccess] = useState(null);
   const [isDeploying, setIsDeploying] = useState(false);
+
+  useEffect(() => {
+    hostService.listHosts()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setHosts(list);
+        if (list.length > 0 && !hostId) {
+          setHostId(list[0].id);
+        }
+      })
+      .catch(() => setHosts([]));
+  }, []);
 
   const canBuild = useMemo(() => {
     return hostId.trim() && (dockerfile.trim() || contextZip);
@@ -317,15 +331,31 @@ export default function Dashboard({ theme, toggleTheme }) {
                   <form onSubmit={handleBuild} className="space-y-5">
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="host-id">Host ID</Label>
-                        <Input
-                          id="host-id"
-                          type="number"
-                          min="1"
-                          value={hostId}
-                          onChange={(e) => setHostId(e.target.value)}
-                          required
-                        />
+                        <Label htmlFor="host-id">Host</Label>
+                        {hosts.length > 0 ? (
+                          <select
+                            id="host-id"
+                            value={hostId}
+                            onChange={(e) => setHostId(e.target.value)}
+                            required
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          >
+                            {hosts.map((h) => (
+                              <option key={h.id} value={h.id}>
+                                {h.alias} ({h.ip_address}:{h.port})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            id="host-id"
+                            type="text"
+                            value={hostId}
+                            onChange={(e) => setHostId(e.target.value)}
+                            placeholder="Host UUID"
+                            required
+                          />
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -503,15 +533,31 @@ export default function Dashboard({ theme, toggleTheme }) {
                 <form className="space-y-4" onSubmit={handleDeployContainer}>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="deploy-host-id">Host ID</Label>
-                      <Input
-                        id="deploy-host-id"
-                        type="number"
-                        min="1"
-                        value={hostId}
-                        onChange={(e) => setHostId(e.target.value)}
-                        required
-                      />
+                      <Label htmlFor="deploy-host-id">Host</Label>
+                      {hosts.length > 0 ? (
+                        <select
+                          id="deploy-host-id"
+                          value={hostId}
+                          onChange={(e) => setHostId(e.target.value)}
+                          required
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        >
+                          {hosts.map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {h.alias} ({h.ip_address}:{h.port})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          id="deploy-host-id"
+                          type="text"
+                          value={hostId}
+                          onChange={(e) => setHostId(e.target.value)}
+                          placeholder="Host UUID"
+                          required
+                        />
+                      )}
                     </div>
 
                     <div className="space-y-2">

@@ -1,12 +1,12 @@
 import logging
 
 from rest_framework import generics
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
 from hosts.models import Host
-from .serializers import RegisterSerializer
+from .serializers import RegisterSerializer, UserSerializer
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -17,15 +17,15 @@ def ensure_default_host_for_user(user):
     if user.role != User.HOST:
         return None
 
-    existing = Host.objects.filter(owner=user).first()
+    existing = Host.objects.filter(created_by=user).first()
     if existing:
         return existing
 
     host = Host.objects.create(
-        name=f"{user.username}-local-host",
-        hostname="localhost",
+        alias=f"{user.username}-local-host",
+        ip_address="127.0.0.1",
         port=2375,
-        owner=user,
+        created_by=user,
     )
     logger.info(
         "Auto-created default host id=%s for user_id=%s username=%s",
@@ -60,3 +60,11 @@ class RegisterView(generics.CreateAPIView):
         user = serializer.save()
         ensure_default_host_for_user(user)
         logger.info("User registered successfully user_id=%s username=%s", user.id, user.username)
+
+
+class UserProfileView(generics.RetrieveAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
