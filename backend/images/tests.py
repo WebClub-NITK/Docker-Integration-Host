@@ -3,6 +3,7 @@ from io import BytesIO
 from zipfile import ZipFile
 from unittest.mock import MagicMock, patch
 
+from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -16,8 +17,8 @@ from .models import ImageDeleteJob, ImagePullJob, ImagePushJob
 
 User = get_user_model()
 
-# A valid Fernet key for tests (same one used in registries tests).
-TEST_ENCRYPTION_KEY = "ZXcxMjNkRmVybmV0S2V5X18xMjM0NTY3ODkwYWJjZD0="
+# Generate an ephemeral Fernet key for tests to avoid committing static keys.
+TEST_ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 
 # --------------------------------------------------------------------------- #
@@ -250,7 +251,7 @@ class ImagePullWorkerTest(TestCase):
             registry_url="https://ghcr.io",
             username="ghuser",
         )
-        cred.token = "ghp_secret_token"
+        cred.token = "registry_pull_token"
         cred.save()
 
         job = ImagePullJob.objects.create(
@@ -271,7 +272,7 @@ class ImagePullWorkerTest(TestCase):
         _, call_kwargs = mock_client.api.pull.call_args
         self.assertEqual(call_kwargs["auth_config"]["username"], "ghuser")
         self.assertEqual(
-            call_kwargs["auth_config"]["password"], "ghp_secret_token"
+            call_kwargs["auth_config"]["password"], "registry_pull_token"
         )
 
     def test_nonexistent_job_id_does_not_raise(self):

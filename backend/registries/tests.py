@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework import status
@@ -11,8 +12,8 @@ from .permissions import IsCredentialOwner
 
 User = get_user_model()
 
-# A valid Fernet key for tests (generated via Fernet.generate_key()).
-TEST_ENCRYPTION_KEY = "ZXcxMjNkRmVybmV0S2V5X18xMjM0NTY3ODkwYWJjZD0="
+# Generate an ephemeral Fernet key for tests to avoid committing static keys.
+TEST_ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 
 @override_settings(FIELD_ENCRYPTION_KEY=TEST_ENCRYPTION_KEY)
@@ -52,13 +53,13 @@ class RegistryCredentialModelUnitTest(TestCase):
             registry_url="https://ghcr.io",
             username="ghuser",
         )
-        cred.token = "ghp_supersecret"
+        cred.token = "registry_test_token"
         cred.save()
 
         # Read from DB directly – internal field must be encrypted
         from_db = RegistryCredential.objects.get(pk=cred.pk)
-        self.assertNotEqual(from_db._encrypted_token, "ghp_supersecret")
-        self.assertEqual(from_db.token, "ghp_supersecret")
+        self.assertNotEqual(from_db._encrypted_token, "registry_test_token")
+        self.assertEqual(from_db.token, "registry_test_token")
 
 
 @override_settings(FIELD_ENCRYPTION_KEY=TEST_ENCRYPTION_KEY)
