@@ -6,6 +6,7 @@ import AddHostModal from '../components/AddHostModal';
 import AssignHostModal from '../components/AssignHostModal';
 import ImageGallery from '../components/ImageGallery';
 import ImageManager from '../components/ImageManager';
+import { formatApiError } from '../utils/formatApiError';
 import { imageService } from '../services/imageService';
 import '../index.css';
 
@@ -179,8 +180,10 @@ export default function DashboardPage() {
         setSelectedHostId(host.id);
       }
     } catch (err) {
-      const message = err?.response?.data?.detail || err?.response?.data?.error ||
-        'Could not create a host. Register/login with Admin role.';
+      const message = formatApiError(
+        err,
+        'Could not create a host. Register/login with Admin role.'
+      );
       setEmptyStateError(message);
     } finally {
       setCreatingLocalHost(false);

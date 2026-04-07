@@ -173,6 +173,15 @@ export const imageService = {
     return await response.json();
   },
 
+  async getPullJob(hostId, jobId) {
+    const token = localStorage.getItem('access_token');
+    const response = await fetch(`${API_BASE_URL}/api/hosts/${hostId}/images/pull/${jobId}/`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(parseErrorPayload(await response.json().catch(() => null)));
+    return await response.json();
+  },
+
   async deleteImage(hostId, imageRef) {
     const token = localStorage.getItem('access_token');
     const response = await fetch(`${API_BASE_URL}/api/hosts/${hostId}/images/delete/`, {

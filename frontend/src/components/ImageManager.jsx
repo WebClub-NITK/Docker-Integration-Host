@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { imageService } from '../services/imageService';
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export default function ImageManager({ hostId, onImageCreated }) {
   const [pullImageRef, setPullImageRef] = useState('alpine:latest');
   const [pullLoading, setPullLoading] = useState(false);
@@ -23,9 +25,26 @@ export default function ImageManager({ hostId, onImageCreated }) {
     clearMessages();
     setPullLoading(true);
     try {
-      await imageService.pullImage(hostId, pullImageRef);
-      setSuccess(`Background pull job started for ${pullImageRef}. Check the registry refresh in a few seconds.`);
-      onImageCreated?.();
+      const job = await imageService.pullImage(hostId, pullImageRef);
+      setSuccess(`Pull job started for ${pullImageRef}. Waiting for Docker to finish...`);
+
+      let finalJob = job;
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        await delay(1000);
+        finalJob = await imageService.getPullJob(hostId, job.id);
+
+        if (finalJob.status === 'SUCCESS') {
+          setSuccess(`Image pulled successfully: ${pullImageRef}`);
+          onImageCreated?.();
+          return;
+        }
+
+        if (finalJob.status === 'FAILED' || finalJob.status === 'CANCELLED') {
+          throw new Error(finalJob.error_message || `Pull job ended with status ${finalJob.status}.`);
+        }
+      }
+
+      setSuccess(`Pull job is still running for ${pullImageRef}. Refresh in a few seconds to see the image.`);
     } catch (err) {
       setError(err.message);
     } finally {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createHost } from '../api/hosts';
+import { formatApiError } from '../utils/formatApiError';
 import '../index.css';
 
 export default function AddHostModal({ onClose, onCreated }) {
@@ -30,7 +31,7 @@ export default function AddHostModal({ onClose, onCreated }) {
       onCreated(res.data);
       onClose();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to register host. Please check details.');
+      setError(formatApiError(err, 'Failed to register host. Please check details.'));
     } finally {
       setLoading(false);
     }
