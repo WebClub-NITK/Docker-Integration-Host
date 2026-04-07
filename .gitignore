@@ -29,6 +29,10 @@ lerna-debug.log*
 .env
 *.local
 
+# Local databases
+db.*
+backend/db.*
+
 # Editor and OS
 .vscode/*
 !.vscode/extensions.json
