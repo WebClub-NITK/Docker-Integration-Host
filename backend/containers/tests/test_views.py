@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from django.contrib.auth import get_user_model
 
 from containers.models import Host, ContainerRecord, ContainerLifecycleEvent, ExecTicket
+from hosts.models import Host as AccessHost, UserHostRole
 
 User = get_user_model()
 
@@ -170,6 +171,49 @@ class TestContainerListCreateView:
         assert response.status_code == 400
         assert 'error' in response.data
 
+    def test_assigned_admin_can_create_container(
+        self, db, host, user, mock_docker
+    ):
+        # Global role is viewer, but host assignment grants ADMIN on this host.
+        assigned_user = User.objects.create_user(
+            username='assigned-admin',
+            password='pass123',
+            role='viewer',
+        )
+
+        access_host = AccessHost.objects.create(
+            alias='shared-host',
+            ip_address=host.ip_address,
+            port=host.port,
+            created_by=user,
+        )
+        UserHostRole.objects.create(
+            user=assigned_user,
+            host=access_host,
+            role='ADMIN',
+            assigned_by=user,
+        )
+
+        token = str(AccessToken.for_user(assigned_user))
+        assigned_client = APIClient()
+        assigned_client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+
+        mock_sdk_container = MagicMock()
+        mock_sdk_container.id = 'sha256assigned'
+        mock_docker.containers.run.return_value = mock_sdk_container
+
+        response = assigned_client.post(
+            f'/api/hosts/{host.id}/containers/',
+            {
+                'image_ref': 'nginx:alpine',
+                'name': 'assigned-create',
+            },
+            format='json',
+        )
+
+        assert response.status_code == 201
+        assert response.data['name'] == 'assigned-create'
+
 class TestContainerDetailView:
 
     def test_get_returns_200(
@@ -213,6 +257,72 @@ class TestContainerDetailView:
             f'/api/hosts/{host.id}/containers/{container_record.id}/'
         )
         assert response.status_code == 400
+
+    def test_assigned_admin_can_delete_container(
+        self, db, host, container_record, user, mock_docker
+    ):
+        assigned_user = User.objects.create_user(
+            username='assigned-admin-delete',
+            password='pass123',
+            role='viewer',
+        )
+
+        access_host = AccessHost.objects.create(
+            alias='shared-host-delete-admin',
+            ip_address=host.ip_address,
+            port=host.port,
+            created_by=user,
+        )
+        UserHostRole.objects.create(
+            user=assigned_user,
+            host=access_host,
+            role='ADMIN',
+            assigned_by=user,
+        )
+
+        token = str(AccessToken.for_user(assigned_user))
+        assigned_client = APIClient()
+        assigned_client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+
+        mock_docker.containers.get.return_value = MagicMock()
+
+        response = assigned_client.delete(
+            f'/api/hosts/{host.id}/containers/{container_record.id}/'
+        )
+        assert response.status_code == 200
+
+    def test_assigned_host_owner_can_delete_container(
+        self, db, host, container_record, user, mock_docker
+    ):
+        assigned_user = User.objects.create_user(
+            username='assigned-owner-delete',
+            password='pass123',
+            role='viewer',
+        )
+
+        access_host = AccessHost.objects.create(
+            alias='shared-host-delete-owner',
+            ip_address=host.ip_address,
+            port=host.port,
+            created_by=user,
+        )
+        UserHostRole.objects.create(
+            user=assigned_user,
+            host=access_host,
+            role='HOST_OWNER',
+            assigned_by=user,
+        )
+
+        token = str(AccessToken.for_user(assigned_user))
+        assigned_client = APIClient()
+        assigned_client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+
+        mock_docker.containers.get.return_value = MagicMock()
+
+        response = assigned_client.delete(
+            f'/api/hosts/{host.id}/containers/{container_record.id}/'
+        )
+        assert response.status_code == 200
 
 
 class TestLifecycleViews:

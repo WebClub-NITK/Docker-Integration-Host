@@ -21,19 +21,25 @@ function statusClass(host) {
   return 'status-online';
 }
 
+function normalizeRole(role) {
+  return typeof role === 'string' ? role.trim().toUpperCase() : '';
+}
+
 /* ── HostCard ── */
 function HostCard({ host }) {
+  const normalizedRole = normalizeRole(host.role);
+
   const roleClass = {
     ADMIN: 'badge-admin',
     HOST_OWNER: 'badge-owner',
     VIEWER: 'badge-viewer',
-  }[host.role] || 'badge-viewer';
+  }[normalizedRole] || 'badge-viewer';
 
   const roleLabel = {
     ADMIN: 'Admin',
     HOST_OWNER: 'Host owner',
     VIEWER: 'Viewer',
-  }[host.role] || host.role;
+  }[normalizedRole] || host.role;
 
   return (
     <div className="host-card">
@@ -448,9 +454,17 @@ export default function DashboardPage() {
     }
   };
 
-  const isAdmin = user?.role?.toUpperCase() === 'ADMIN' || user?.is_superuser;
-  const isHostOwner = user?.role?.toUpperCase() === 'HOST';
-  const canOperate = isAdmin || isHostOwner;
+  const normalizedUserRole = normalizeRole(user?.role);
+  const isAdmin = normalizedUserRole === 'ADMIN' || user?.is_superuser;
+  const isHostOwner = normalizedUserRole === 'HOST' || normalizedUserRole === 'HOST_OWNER';
+  const selectedHost = hosts.find((h) => String(h.id) === String(selectedHostId));
+  const selectedHostRole = normalizeRole(
+    selectedHost?.role || selectedHost?.user_role || selectedHost?.assigned_role
+  );
+  const isSelectedHostAdmin = selectedHostRole === 'ADMIN';
+  const isSelectedHostOwner = selectedHostRole === 'HOST_OWNER';
+  const canOperate = isAdmin || isHostOwner || isSelectedHostAdmin || isSelectedHostOwner;
+  const canRemoveContainers = canOperate;
 
   const statusBadgeClass = (status) => {
     const normalized = (status || '').toUpperCase();
@@ -696,7 +710,7 @@ export default function DashboardPage() {
                         <button className="btn-secondary" style={{ padding: '6px 9px', fontSize: '11px' }} onClick={() => handleContainerAction(item.id, 'pause')} disabled={!canOperate}>Pause</button>
                         <button className="btn-secondary" style={{ padding: '6px 9px', fontSize: '11px' }} onClick={() => handleContainerAction(item.id, 'unpause')} disabled={!canOperate}>Unpause</button>
                         <button className="btn-secondary" style={{ padding: '6px 9px', fontSize: '11px' }} onClick={() => handleContainerAction(item.id, 'kill')} disabled={!canOperate}>Kill</button>
-                        <button className="btn-secondary" style={{ padding: '6px 9px', fontSize: '11px', color: '#b91c1c' }} onClick={() => handleContainerRemove(item.id)} disabled={!isAdmin}>Remove</button>
+                        <button className="btn-secondary" style={{ padding: '6px 9px', fontSize: '11px', color: '#b91c1c' }} onClick={() => handleContainerRemove(item.id)} disabled={!canRemoveContainers}>Remove</button>
                       </div>
                     </div>
 

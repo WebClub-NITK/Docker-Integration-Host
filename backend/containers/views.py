@@ -80,7 +80,7 @@ class ContainerDetailView(APIView):
         return Response(ContainerRecordSerializer(record).data)
 
     @require_auth
-    @require_role(["ADMIN"])
+    @require_role(["ADMIN", "HOST_OWNER"])
     def delete(self, request, host_id, container_id):
         host = get_object_or_404(Host, pk=host_id)
         record = get_object_or_404(ContainerRecord, pk=container_id, host=host)
