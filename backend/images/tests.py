@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from hosts.models import Host
+from hosts.models import Host, UserHostRole
 from registries.models import RegistryCredential
 
 from .models import ImageDeleteJob, ImagePullJob, ImagePushJob
@@ -30,10 +30,10 @@ class ImagePullJobModelTest(TestCase):
             username="modelowner", password="password123", role="admin"
         )
         self.host = Host.objects.create(
-            name="Test Host",
-            hostname="192.168.1.100",
+            alias="Test Host",
+            ip_address="192.168.1.100",
             port=2375,
-            owner=self.owner,
+            created_by=self.owner,
         )
 
     def test_string_representation(self):
@@ -126,7 +126,7 @@ class ImagePullPermissionTest(TestCase):
 
         perm = IsAdminOrHostOwner()
         req = self._request("POST", self.host_user)
-        self.assertTrue(perm.has_permission(req, None))
+        self.assertFalse(perm.has_permission(req, None))
 
     def test_admin_only_denies_viewer(self):
         from .permissions import IsAdminOnly
@@ -153,10 +153,10 @@ class ImagePullWorkerTest(TestCase):
             username="wowner", password="password123", role="admin"
         )
         self.host = Host.objects.create(
-            name="Worker Host",
-            hostname="10.0.0.1",
+            alias="Worker Host",
+            ip_address="10.0.0.1",
             port=2375,
-            owner=self.owner,
+            created_by=self.owner,
         )
 
     @patch("images.worker.docker.DockerClient")
@@ -301,11 +301,25 @@ class ImagePullJobRouteIntegrationTest(TestCase):
             username="iviewer", password="password123", role="viewer"
         )
         self.host = Host.objects.create(
-            name="Route Host",
-            hostname="192.168.1.50",
+            alias="Route Host",
+            ip_address="192.168.1.50",
             port=2375,
-            owner=self.host_owner,
+            created_by=self.host_owner,
         )
+
+        UserHostRole.objects.create(
+            user=self.host_owner,
+            host=self.host,
+            role="HOST_OWNER",
+            assigned_by=self.admin,
+        )
+        UserHostRole.objects.create(
+            user=self.viewer,
+            host=self.host,
+            role="VIEWER",
+            assigned_by=self.admin,
+        )
+
         self.base_url = f"/api/hosts/{self.host.id}/images/pull/"
 
     # ---- LIST ---- #
@@ -328,10 +342,10 @@ class ImagePullJobRouteIntegrationTest(TestCase):
             image_ref="nginx:latest",
         )
         other_host = Host.objects.create(
-            name="Other Host",
-            hostname="192.168.1.51",
+            alias="Other Host",
+            ip_address="192.168.1.51",
             port=2375,
-            owner=self.admin,
+            created_by=self.admin,
         )
         ImagePullJob.objects.create(
             host=other_host,
@@ -363,7 +377,7 @@ class ImagePullJobRouteIntegrationTest(TestCase):
 
     @patch("images.views.enqueue_pull")
     def test_create_job_as_host_owner(self, mock_enqueue):
-        """Host owner can enqueue a pull on their own host."""
+        """Host owner cannot enqueue pulls; image writes are admin-only."""
         mock_enqueue.return_value = None
 
         self.client.force_authenticate(user=self.host_owner)
@@ -372,7 +386,7 @@ class ImagePullJobRouteIntegrationTest(TestCase):
             {"image_ref": "redis:7"},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_create_job_denied_for_viewer(self):
         """Viewer role cannot create pull jobs."""
@@ -489,7 +503,7 @@ class ImagePullJobRouteIntegrationTest(TestCase):
     def test_retrieve_job_from_different_host_returns_404(self):
         """Job on a different host should not be retrievable via this host's URL."""
         other_host = Host.objects.create(
-            name="Other", hostname="10.10.10.10", port=2375, owner=self.admin
+            alias="Other", ip_address="10.10.10.10", port=2375, created_by=self.admin
         )
         job = ImagePullJob.objects.create(
             host=other_host,
@@ -576,10 +590,10 @@ class ImageBuildRouteIntegrationTest(TestCase):
             username="bviewer", password="password123", role="viewer"
         )
         self.host = Host.objects.create(
-            name="Build Host",
-            hostname="192.168.1.77",
+            alias="Build Host",
+            ip_address="192.168.1.77",
             port=2375,
-            owner=self.host_owner,
+            created_by=self.host_owner,
         )
         self.url = f"/api/hosts/{self.host.id}/images/build/"
 
@@ -686,10 +700,10 @@ class ImagePushDeleteRouteIntegrationTest(TestCase):
             username="pd_viewer", password="password123", role="viewer"
         )
         self.host = Host.objects.create(
-            name="PushDelete Host",
-            hostname="192.168.1.60",
+            alias="PushDelete Host",
+            ip_address="192.168.1.60",
             port=2375,
-            owner=self.host_owner,
+            created_by=self.host_owner,
         )
         self.push_url = f"/api/hosts/{self.host.id}/images/push/"
         self.delete_url = f"/api/hosts/{self.host.id}/images/delete/"
@@ -855,10 +869,10 @@ class ImagePullJobSerializerTest(TestCase):
             username="suser", password="password123", role="admin"
         )
         self.host = Host.objects.create(
-            name="Ser Host",
-            hostname="10.0.0.5",
+            alias="Ser Host",
+            ip_address="10.0.0.5",
             port=2375,
-            owner=self.user,
+            created_by=self.user,
         )
 
     def test_read_serializer_fields(self):
@@ -985,10 +999,10 @@ class ImageInspectRouteIntegrationTest(TestCase):
             username="inspect_viewer", password="password123", role="viewer"
         )
         self.host = Host.objects.create(
-            name="Inspect Host",
-            hostname="192.168.1.99",
+            alias="Inspect Host",
+            ip_address="192.168.1.99",
             port=2375,
-            owner=self.admin,
+            created_by=self.admin,
         )
         self.base_url = f"/api/hosts/{self.host.id}/images/inspect/"
 
@@ -1529,10 +1543,10 @@ class ImageInspectRouteIntegrationTest(TestCase):
     def test_inspect_uses_correct_host_port(self, MockClient):
         """Should connect using the host's configured port (e.g. TLS 2376)."""
         tls_host = Host.objects.create(
-            name="TLS Host",
-            hostname="10.0.0.50",
+            alias="TLS Host",
+            ip_address="10.0.0.50",
             port=2376,
-            owner=self.admin,
+            created_by=self.admin,
         )
         mock_client = MagicMock()
         MockClient.return_value = mock_client
