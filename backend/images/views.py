@@ -33,6 +33,25 @@ from .worker import enqueue_pull, enqueue_push, enqueue_delete
 logger = logging.getLogger(__name__)
 
 
+def _assigned_host_role(user, host):
+    return UserHostRole.objects.filter(
+        user=user,
+        host=host,
+    ).values_list("role", flat=True).first()
+
+
+def _can_read_images_on_host(user, host):
+    if user.is_superuser or user.role == "admin":
+        return True
+    return _assigned_host_role(user, host) in {"VIEWER", "HOST_OWNER", "ADMIN"}
+
+
+def _can_write_images_on_host(user, host):
+    if user.is_superuser or user.role == "admin":
+        return True
+    return _assigned_host_role(user, host) == "ADMIN"
+
+
 def _is_local_hostname(hostname: str) -> bool:
     value = (hostname or "").strip().lower()
     return value in {"localhost", "127.0.0.1", "::1"}
@@ -104,7 +123,7 @@ class ImagePullJobListCreateView(generics.ListCreateAPIView):
         host = self.get_host()
 
         # Check object-level permission (is user admin or host owner?)
-        if not _user_can_manage_host(request.user, host):
+        if request.user.role != "admin" and host.created_by != request.user:
             return Response(
                 {"detail": "You do not have permission to pull images on this host."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -161,7 +180,7 @@ class ImagePullJobDetailCancelView(generics.RetrieveDestroyAPIView):
         job = self.get_object()
 
         # Only admins can cancel
-        if not _user_is_admin(request.user):
+        if request.user.role != "admin":
             return Response(
                 {"detail": "Only admins can cancel pull jobs."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -243,7 +262,7 @@ class ImageBuildStreamView(APIView):
     def post(self, request, host_id):
         host = get_object_or_404(Host, pk=host_id)
 
-        if not _user_can_manage_host(request.user, host):
+        if request.user.role != "admin" and host.created_by != request.user:
             return Response(
                 {"detail": "You do not have permission to build images on this host."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -344,6 +363,12 @@ class ImageInspectView(APIView):
     def get(self, request, host_id):
         host = get_object_or_404(Host, pk=host_id)
 
+        if not _can_read_images_on_host(request.user, host):
+            return Response(
+                {"detail": "You do not have permission to inspect images on this host."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         image_ref = request.query_params.get("image_ref")
         if not image_ref:
             return Response(
@@ -440,7 +465,7 @@ class HostImageListView(APIView):
     def get(self, request, host_id):
         host = get_object_or_404(Host, pk=host_id)
 
-        if not _user_can_manage_host(request.user, host):
+        if not _can_read_images_on_host(request.user, host):
             return Response(
                 {"detail": "You do not have permission to list images on this host."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -524,7 +549,7 @@ class ImagePushJobListCreateView(generics.ListCreateAPIView):
         host = self.get_host()
 
         # Check object-level permission (is user admin or host owner?)
-        if not _user_can_manage_host(request.user, host):
+        if request.user.role != "admin" and host.created_by != request.user:
             return Response(
                 {"detail": "You do not have permission to push images on this host."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -583,7 +608,7 @@ class ImagePushJobDetailCancelView(generics.RetrieveDestroyAPIView):
         job = self.get_object()
 
         # Only admins can cancel
-        if not _user_is_admin(request.user):
+        if request.user.role != "admin":
             return Response(
                 {"detail": "Only admins can cancel push jobs."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -639,7 +664,7 @@ class ImageDeleteJobListCreateView(generics.ListCreateAPIView):
         host = self.get_host()
 
         # Check object-level permission (is user admin or host owner?)
-        if not _user_can_manage_host(request.user, host):
+        if request.user.role != "admin" and host.created_by != request.user:
             return Response(
                 {"detail": "You do not have permission to delete images on this host."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -693,7 +718,7 @@ class ImageDeleteJobDetailCancelView(generics.RetrieveDestroyAPIView):
         job = self.get_object()
 
         # Only admins can cancel
-        if not _user_is_admin(request.user):
+        if request.user.role != "admin":
             return Response(
                 {"detail": "Only admins can cancel delete jobs."},
                 status=status.HTTP_403_FORBIDDEN,

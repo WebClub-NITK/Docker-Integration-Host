@@ -213,7 +213,11 @@ export default function DashboardPage() {
   };
 
   const loadContainers = async (explicitHostId) => {
-    const targetHostId = String(explicitHostId || containerHostId || '');
+    const explicitId =
+      typeof explicitHostId === 'string' || typeof explicitHostId === 'number'
+        ? explicitHostId
+        : '';
+    const targetHostId = String(explicitId || containerHostId || '');
     if (!targetHostId) {
       setContainers([]);
       return;
@@ -651,7 +655,7 @@ export default function DashboardPage() {
                 />
               </div>
 
-              <button className="btn-secondary" onClick={loadContainers}>
+              <button className="btn-secondary" onClick={() => loadContainers()}>
                 {containersLoading ? 'Refreshing…' : 'Refresh'}
               </button>
 
