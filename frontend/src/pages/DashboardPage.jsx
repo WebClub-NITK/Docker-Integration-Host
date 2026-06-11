@@ -8,6 +8,7 @@ import ImageGallery from '../components/ImageGallery';
 import ImageManager from '../components/ImageManager';
 import { formatApiError } from '../utils/formatApiError';
 import { imageService } from '../services/imageService';
+import { useNavigate } from 'react-router-dom';
 import '../index.css';
 
 /* ── Helper: initials from username ── */
@@ -63,6 +64,7 @@ function HostCard({ host }) {
 
 /* ── Dashboard ── */
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [hosts, setHosts] = useState([]);
   const [selectedHostId, setSelectedHostId] = useState(null);
@@ -552,9 +554,9 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="host-grid">
-            {hosts.map((host) => (
+            {hosts.map((host, index) => (
               <div
-                key={host.id}
+                key={host.id || index}
                 className={`card-wrapper ${selectedHostId === host.id ? 'active' : ''}`}
                 onClick={() => setSelectedHostId(host.id)}
               >
@@ -562,6 +564,18 @@ export default function DashboardPage() {
 
                 {/* Admin actions or viewer message */}
                 <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '11px' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/hosts/${host.id}/networks`);
+                    }}
+                  >
+                    Networks
+                  </button>
+
                   {(host.role === 'ADMIN' || user?.is_superuser) ? (
                     <button
                       className="btn-secondary"
@@ -574,10 +588,18 @@ export default function DashboardPage() {
                       Assign User
                     </button>
                   ) : (
-                    <span style={{ fontSize: '11px', color: '#888', fontStyle: 'italic', padding: '6px 0' }}>
-                      Cannot add roles for docker hosts
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        color: '#888',
+                        fontStyle: 'italic',
+                        padding: '6px 0',
+                      }}
+                    >
+                      Read Only
                     </span>
                   )}
+
                 </div>
               </div>
             ))}
@@ -686,8 +708,8 @@ export default function DashboardPage() {
               {containers.length === 0 ? (
                 <p className="empty-sub">No containers found for this host id. Click Refresh or Create.</p>
               ) : (
-                containers.map((item) => (
-                  <div key={item.id} style={{ border: '1px solid #e5e5e5', borderRadius: '10px', padding: '10px' }}>
+                containers.map((item, index) => (
+                  <div key={item.id || index} style={{ border: '1px solid #e5e5e5', borderRadius: '10px', padding: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                       <div>
                         <div className="host-name">{item.name}</div>

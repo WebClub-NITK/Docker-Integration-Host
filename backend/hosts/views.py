@@ -40,6 +40,11 @@ class HostListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         host = serializer.save(created_by=self.request.user)
+        UserHostRole.objects.get_or_create(
+            user=self.request.user,
+            host=host,
+            defaults={'role': 'ADMIN', 'assigned_by': self.request.user}
+        )
         logger.info(f"Host '{host.alias}' registered by {self.request.user.username}")
 
 

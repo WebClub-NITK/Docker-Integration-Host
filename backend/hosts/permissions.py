@@ -39,7 +39,29 @@ class CanAccessHost(BasePermission):
     """Any role (VIEWER, HOST_OWNER, ADMIN) grants read access to a host."""
     message = "You are not assigned to this host."
 
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        
+        # Check if host_id is in URL kwargs (e.g. nested routes like networks)
+        host_id = view.kwargs.get('host_id')
+        if host_id:
+            return UserHostRole.objects.filter(user=request.user, host_id=host_id).exists()
+        return True
+
     def has_object_permission(self, request, view, obj):
         if request.user.is_superuser:
             return True
-        return UserHostRole.objects.filter(user=request.user, host_id=obj.id).exists()
+        
+        from .models import Host
+        if isinstance(obj, Host):
+            host_id = obj.id
+        elif hasattr(obj, 'host_id'):
+            host_id = obj.host_id
+        elif hasattr(obj, 'host'):
+            host_id = obj.host.id
+        else:
+            host_id = obj.id
+        return UserHostRole.objects.filter(user=request.user, host_id=host_id).exists()

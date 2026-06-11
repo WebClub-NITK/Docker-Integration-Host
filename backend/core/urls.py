@@ -24,7 +24,7 @@ urlpatterns = [
     path('api/auth/', include('authentication.urls')),
     path('api/users/', include('users.urls')),
     path('api/hosts/', include('hosts.urls')),
-    path('api/networks/', include('networks.urls')),
+    path('api/', include('networks.urls')),
     path('api/', include('containers.urls')),
     path('api/registries/', include('registries.urls')),
     path('api/hosts/<str:host_id>/images/', include('images.urls')),
